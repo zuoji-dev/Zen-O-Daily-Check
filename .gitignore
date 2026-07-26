@@ -1,0 +1,7 @@
+# Playwright debug artifacts
+.playwright-mcp/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

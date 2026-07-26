@@ -1,0 +1,57 @@
+# =============================================================================
+# Zen-O Daily Check-in — GitHub Actions Workflow
+# =============================================================================
+# Triggers daily at 00:00 UTC (08:00 UTC+8). The script adds a random delay
+# of 0–7200 seconds so the actual check-in lands between 08:00–10:00 UTC+8.
+#
+# Required repository secrets:
+#   ZENO_AUTH_TOKEN — your Bearer token (see README for how to get it)
+# =============================================================================
+
+name: zeno-daily-checkin
+
+on:
+  schedule:
+    # Every day at 00:00 UTC = 08:00 UTC+8
+    - cron: '0 0 * * *'
+  # Allow manual trigger from the Actions tab for testing
+  workflow_dispatch:
+
+jobs:
+  checkin:
+    name: Daily Check-in
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: ⏬ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate secret
+        run: |
+          if [ -z "${{ secrets.ZENO_AUTH_TOKEN }}" ]; then
+            echo "::error::ZENO_AUTH_TOKEN secret is not set."
+            echo "::error::Go to Settings → Secrets and variables → Actions to add it."
+            exit 1
+          fi
+          echo "ZENO_AUTH_TOKEN is configured ✓"
+
+      - name: ✅ Install dependencies
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq jq
+          echo "jq $(jq --version) installed ✓"
+
+      - name: 🎲 Run daily check-in
+        id: checkin
+        run: |
+          bash scripts/zeno-checkin.sh
+        env:
+          ZENO_AUTH_TOKEN: ${{ secrets.ZENO_AUTH_TOKEN }}
+
+      - name: 📋 Summary
+        if: always()
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "  Zen-O Check-in completed"
+          echo "  Time: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+          echo "═══════════════════════════════════════════"
