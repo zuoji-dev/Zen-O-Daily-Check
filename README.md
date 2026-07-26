@@ -1,6 +1,7 @@
 # Zen-O 自动签到 🤖
 
-> 每天 UTC+8 08:00–10:00 随机时间自动签到 [Zen-O](https://app.zen-o.xyz/)，使用 GitHub Actions 部署。
+> 每天 UTC+8 08:17 自动签到 [Zen-O](https://app.zen-o.xyz/)，使用 GitHub Actions 部署。
+> ⚡ 每次执行仅 ~10 秒，不浪费 Actions 免费额度。
 
 ## 目录
 
@@ -19,10 +20,7 @@
 ## 工作原理
 
 ```
-GitHub Actions (cron: 00:00 UTC)
-        │
-        ▼
-  随机等待 0–7200 秒（使签到落在 08:00–10:00 UTC+8）
+GitHub Actions (cron: 00:17 UTC = 08:17 UTC+8)
         │
         ▼
   GET /attendance-info  → 查询本周签到状态
@@ -31,7 +29,7 @@ GitHub Actions (cron: 00:00 UTC)
   POST /attendance-check-in  → 执行签到
         │
         ▼
-  输出结果到 Actions 日志
+  输出结果到 Actions 日志（全程 ~10 秒）
 ```
 
 ## 快速开始
@@ -159,7 +157,7 @@ Zen-O 使用 Bearer Token 认证，你需要从浏览器中提取：
 ## 常见问题
 
 ### Q: 签到时间如何确定？
-A: 工作流在 00:00 UTC（08:00 UTC+8）触发，脚本随机延迟 0–7200 秒，最终签到落在 08:00–10:00 UTC+8 之间。
+A: 工作流在 00:17 UTC（08:17 UTC+8）触发，落在 08:00–10:00 UTC+8 窗口内。选 17 分而非整点/半点，避开 cron 全局拥堵。每次执行仅 ~10 秒，不消耗 Actions 免费额度。
 
 ### Q: 周六日会签到吗？
 A: 会的，每天都会触发。如果只需要工作日，将 cron 改为 `0 0 * * 1-5`。

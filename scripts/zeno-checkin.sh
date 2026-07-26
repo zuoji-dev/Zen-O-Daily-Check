@@ -7,8 +7,8 @@
 #
 # Description:
 #   Automates the daily check-in for Zen-O platform (https://app.zen-o.xyz/).
-#   Designed to be run via GitHub Actions. Handles random delay within the
-#   08:00–10:00 UTC+8 window, calls the attendance API, and reports results.
+#   Designed to be run via GitHub Actions. Calls the attendance API and
+#   reports results. Should be triggered by cron; no internal delay.
 #
 # Prerequisites:
 #   - curl, jq installed
@@ -19,7 +19,6 @@ set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 API_BASE_URL="https://api.zen-o.xyz/functions/v1"
-MAX_SLEEP_SECONDS=7200  # 2 hours max for randomization within 08:00–10:00 UTC+8
 
 # ── Color output helpers ───────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -56,25 +55,6 @@ if ! command -v jq &>/dev/null; then
 else
   JQ_AVAILABLE=true
 fi
-
-# ── Random delay (0–2 hours) for 08:00–10:00 UTC+8 window ─────────────────────
-RANDOM_SLEEP=$((RANDOM % MAX_SLEEP_SECONDS))
-SLEEP_MINUTES=$((RANDOM_SLEEP / 60))
-SLEEP_SECONDS_REMAINDER=$((RANDOM_SLEEP % 60))
-
-info "Scheduling check-in at a random time within 08:00–10:00 UTC+8..."
-info "Waiting ${SLEEP_MINUTES}m${SLEEP_SECONDS_REMAINDER}s before check-in..."
-
-# Use a simple progress indicator while sleeping
-for ((i = 0; i < RANDOM_SLEEP; i++)); do
-  sleep 1
-  # Show a dot every 60 seconds
-  if ((i % 60 == 59)); then
-    echo -n "."
-  fi
-done
-echo ""
-ok "Delay complete. Proceeding with check-in."
 
 # ── Helper: API call with curl ─────────────────────────────────────────────────
 api_call() {

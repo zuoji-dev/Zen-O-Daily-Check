@@ -1,8 +1,10 @@
 # =============================================================================
 # Zen-O Daily Check-in — GitHub Actions Workflow
 # =============================================================================
-# Triggers daily at 00:00 UTC (08:00 UTC+8). The script adds a random delay
-# of 0–7200 seconds so the actual check-in lands between 08:00–10:00 UTC+8.
+# Triggers daily at 00:17 UTC (08:17 UTC+8), within the 08:00–10:00 window.
+# ⚠️ 不要在脚本内 sleep — 那会消耗 GitHub Actions 免费额度。
+#    私库 2000 min/月，sleep 1h × 30天 = 1800 min，几乎用光。
+#    改为 cron 直接定在目标窗口内，执行只要 ~10 秒。
 #
 # Required repository secrets:
 #   ZENO_AUTH_TOKEN — your Bearer token (see README for how to get it)
@@ -12,8 +14,9 @@ name: zeno-daily-checkin
 
 on:
   schedule:
-    # Every day at 00:00 UTC = 08:00 UTC+8
-    - cron: '0 0 * * *'
+    # 00:17 UTC = 08:17 UTC+8，落在 08:00–10:00 窗口内
+    # 选 17 分而非整点/半点，避开 cron 拥堵
+    - cron: '17 0 * * *'
   # Allow manual trigger from the Actions tab for testing
   workflow_dispatch:
 
@@ -21,7 +24,7 @@ jobs:
   checkin:
     name: Daily Check-in
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
 
     steps:
       - name: ⏬ Checkout repository
