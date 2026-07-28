@@ -7,7 +7,9 @@
 #    改为 cron 直接定在目标窗口内，执行只要 ~10 秒。
 #
 # Required repository secrets:
-#   ZENO_AUTH_TOKEN — your Bearer token (see README for how to get it)
+#   ZENO_AUTH_TOKEN    — your Bearer token (see README for how to get it)
+# Optional secrets:
+#   DISCORD_WEBHOOK_URL — Discord webhook URL for notifications
 # =============================================================================
 
 name: zeno-daily-checkin
@@ -30,7 +32,7 @@ jobs:
       - name: ⏬ Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🔍 Validate secret
+      - name: 🔍 Validate secrets
         run: |
           if [ -z "${{ secrets.ZENO_AUTH_TOKEN }}" ]; then
             echo "::error::ZENO_AUTH_TOKEN secret is not set."
@@ -38,6 +40,11 @@ jobs:
             exit 1
           fi
           echo "ZENO_AUTH_TOKEN is configured ✓"
+          if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            echo "DISCORD_WEBHOOK_URL is configured ✓"
+          else
+            echo "DISCORD_WEBHOOK_URL not set — Discord notifications disabled"
+          fi
 
       - name: ✅ Install dependencies
         run: |
@@ -50,6 +57,7 @@ jobs:
           bash scripts/zeno-checkin.sh
         env:
           ZENO_AUTH_TOKEN: ${{ secrets.ZENO_AUTH_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: 📋 Summary
         if: always()

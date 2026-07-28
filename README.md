@@ -119,9 +119,25 @@ Zen-O 使用 Bearer Token 认证，你需要从浏览器中提取：
 
 ## 通知配置（可选）
 
-### Telegram 通知
+签到后可以通过 Discord 接收通知。
 
-在 workflow 最后添加步骤：
+### Discord 通知
+
+1. 在 Discord 服务器中创建一个 **Webhook**（频道 → 编辑 → 集成 → Webhook → 新建）
+2. 复制 Webhook URL
+3. 在 GitHub 仓库设置中添加 Secret：
+   - 仓库 → **Settings** → **Secrets and variables** → **Actions**
+   - **New repository secret**
+   - Name: `DISCORD_WEBHOOK_URL`
+   - Secret: 填入你的 Discord Webhook URL
+4. 下次签到后会自动发送通知到 Discord 频道
+
+通知效果：
+- ✅ **签到成功** — 绿色卡片，显示本周签到进度
+- ⚠️ **已签到** — 黄色卡片，提示当天已签到
+- ❌ **签到失败** — 红色卡片，显示错误信息
+
+### Telegram 通知
 
 ```yaml
 - name: 📬 Telegram 通知

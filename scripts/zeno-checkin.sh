@@ -8,17 +8,19 @@
 # Description:
 #   Automates the daily check-in for Zen-O platform (https://app.zen-o.xyz/).
 #   Designed to be run via GitHub Actions. Calls the attendance API and
-#   reports results. Should be triggered by cron; no internal delay.
+#   reports results. Optionally sends Discord notification on completion.
 #
 # Prerequisites:
 #   - curl, jq installed
 #   - ZENO_AUTH_TOKEN environment variable set
+#   - (optional) DISCORD_WEBHOOK_URL for Discord notifications
 # =============================================================================
 
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 API_BASE_URL="https://api.zen-o.xyz/functions/v1"
+DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
 
 # ── Color output helpers ───────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -79,12 +81,59 @@ api_call() {
   curl "${args[@]}" "${url}"
 }
 
+# ── Helper: Send Discord notification ─────────────────────────────────────────
+send_discord_notification() {
+  local status="$1"    # "success" | "already_checked" | "failed"
+  local message="$2"
+
+  if [ -z "${DISCORD_WEBHOOK_URL}" ]; then
+    return 0  # No webhook configured, skip silently
+  fi
+
+  local color_code
+  case "${status}" in
+    success)         color_code=5763719 ;;  # green  #57F287
+    already_checked) color_code=16776960 ;; # yellow #FFD000
+    failed)          color_code=15548997 ;; # red    #ED4245
+    *)               color_code=5793266  ;; # gray   #5865F2
+  esac
+
+  local current_time
+  current_time="$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+
+  local payload
+  payload=$(cat <<EOF
+{
+  "embeds": [{
+    "title": "🤖 Zen-O Daily Check-in",
+    "description": "${message}",
+    "color": ${color_code},
+    "fields": [
+      { "name": "Time", "value": "${current_time} (UTC+8)", "inline": true },
+      { "name": "Status", "value": "${status}", "inline": true }
+    ],
+    "footer": { "text": "Zen-O Auto Check-in" },
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+  }]
+}
+EOF
+)
+
+  curl -sS -X POST "${DISCORD_WEBHOOK_URL}" \
+    -H "Content-Type: application/json" \
+    -d "${payload}" \
+    --connect-timeout 10 \
+    --max-time 15 \
+    > /dev/null 2>&1 && ok "Discord notification sent ✓" || warn "Discord notification failed"
+}
+
 # ── Step 1: Get attendance info ─────────────────────────────────────────────────
 info "Fetching attendance info..."
 ATTENDANCE_INFO=$(api_call "GET" "/attendance-info" || true)
 
 if [ -z "${ATTENDANCE_INFO}" ]; then
   err "Failed to fetch attendance info — check your token and network."
+  send_discord_notification "failed" "❌ Failed to fetch attendance info — token may be expired."
   exit 1
 fi
 
@@ -112,13 +161,17 @@ CHECKIN_RESULT=$(api_call "POST" "/attendance-check-in" "{}" || true)
 
 if [ -z "${CHECKIN_RESULT}" ]; then
   err "Check-in request failed (empty response)."
+  send_discord_notification "failed" "❌ Check-in request failed (empty response)."
   exit 1
 fi
 
 echo "${CHECKIN_RESULT}" | head -c 500
 echo ""
 
-# ── Step 3: Parse result ───────────────────────────────────────────────────────
+# ── Step 3: Parse result & send notification ──────────────────────────────────
+DISCORD_STATUS=""
+DISCORD_MSG=""
+
 if $JQ_AVAILABLE; then
   CHECKED=$(echo "${CHECKIN_RESULT}" | jq -r '.checked // false')
   ALREADY_CHECKED=$(echo "${CHECKIN_RESULT}" | jq -r '.already_checked // false')
@@ -131,18 +184,29 @@ if $JQ_AVAILABLE; then
     if [ -n "${CHECKED_COUNT_NEW}" ]; then
       info "Weekly progress: ${CHECKED_COUNT_NEW} / ${REQUIRED_COUNT}"
     fi
+    DISCORD_STATUS="success"
+    DISCORD_MSG="✅ Check-in successful! Day **${CHECKED_COUNT_NEW}** of **${REQUIRED_COUNT}** this week."
   elif [ "${ALREADY_CHECKED}" = "true" ]; then
     warn "Already checked in today (${CHECKIN_DATE}). Nothing changed."
+    DISCORD_STATUS="already_checked"
+    DISCORD_MSG="⚠️ Already checked in today (**${CHECKIN_DATE}**). No action taken."
   else
     err "Check-in failed with unexpected response."
     echo "${CHECKIN_RESULT}"
+    DISCORD_STATUS="failed"
+    DISCORD_MSG="❌ Check-in failed: unexpected response. \`${CHECKIN_RESULT:0:200}\`"
     exit 1
   fi
 else
   # Without jq, just echo the raw response
   info "Raw response:"
   echo "${CHECKIN_RESULT}"
+  DISCORD_STATUS="success"
+  DISCORD_MSG="✅ Check-in completed (raw response mode)."
 fi
+
+# ── Send Discord notification ──────────────────────────────────────────────────
+send_discord_notification "${DISCORD_STATUS}" "${DISCORD_MSG}"
 
 # ── Done ────────────────────────────────────────────────────────────────────────
 ok "Check-in process completed."
